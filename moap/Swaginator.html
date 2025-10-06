@@ -17,10 +17,19 @@
 
       --align:center;               /* left | center | right */
       --pad:2vmin;                  /* inner padding */
-      --max-lines:2;                /* <<< set 2 or 3 here */
+      --max-lines:3;                /* <<< set 2 or 3 here */
       --line:1.15;                  /* line-height (tweak 1.1–1.25) */
 
       /* font-size = (viewport height minus padding) / lines, with guard rails */
+      /*
+Want 3 lines? Set --max-lines:3; (font auto-shrinks to fit).
+
+Text still a hair too big/small? Nudge the 0.92 factor up/down.
+
+Need tighter lines? Drop --line to 1.1.
+
+Center vs left: change --align.
+      */
       --size:clamp(12px,
                    calc((100vh - (var(--pad) * 2)) / var(--max-lines) * 0.92),
                    96px);
