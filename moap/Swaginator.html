@@ -8,21 +8,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LSL Message</title>
   <style>
-    /* --- Banner preset for very wide, short MOAP faces --- */
+    /* — Banner, multi-line, no scrollbars — */
     :root{
-      --bg:#0f1115;                     /* background */
-      --fg:#e9eef5;                     /* text color */
-      --accent:#7aa2f7;                 /* unused in banner; keep if you re-add bar */
-      --font:ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
-              'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif;
+      --bg:#0f1115;                 /* background */
+      --fg:#e9eef5;                 /* text colour */
+      --font:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,
+             'Helvetica Neue',Arial,'Noto Sans','Liberation Sans',sans-serif;
 
-      --align:center;                   /* left | center | right */
-      --radius:0;
-      --padding:2vmin;                  /* inner breathing room */
-      --line:1.0;                       /* tighter for single line */
-      /* Size driven by HEIGHT so it fills the strip.
-         55vh = 55% of the viewport height, clamped to stay readable. */
-      --size:clamp(12px, 55vh, 96px);
+      --align:center;               /* left | center | right */
+      --pad:2vmin;                  /* inner padding */
+      --max-lines:2;                /* <<< set 2 or 3 here */
+      --line:1.15;                  /* line-height (tweak 1.1–1.25) */
+
+      /* font-size = (viewport height minus padding) / lines, with guard rails */
+      --size:clamp(12px,
+                   calc((100vh - (var(--pad) * 2)) / var(--max-lines) * 0.92),
+                   96px);
     }
 
     *{ box-sizing:border-box; }
@@ -30,32 +31,40 @@
     html, body{
       margin:0; padding:0; height:100%;
       background:var(--bg); color:var(--fg); font-family:var(--font);
-      overflow:hidden;                    /* kill scrollbars */
+      overflow:hidden;                    /* no scrollbars */
     }
 
     .wrap{ width:100vw; height:100vh; padding:0; }
     .card{
       width:100vw; height:100vh;
       background:var(--bg);
-      border:none; border-radius:0; box-shadow:none;
+      border:0; border-radius:0; box-shadow:none;
       display:grid; place-items:center;
-      padding:var(--padding);
+      padding:0;
     }
 
     .msg{
+      padding:var(--pad);
       font-size:var(--size);
       line-height:var(--line);
       text-align:var(--align);
-      white-space:nowrap;                 /* single line for banners */
-      overflow:hidden; text-overflow:ellipsis;
-      letter-spacing:.2px;
+      white-space:normal;                 /* allow wrapping & <br> */
+      word-break:break-word;
+      overflow-wrap:anywhere;
+      hyphens:auto;
+
+      /* clamp to N lines, ellipsis at end */
+      display:-webkit-box;
+      -webkit-box-orient:vertical;
+      -webkit-line-clamp:var(--max-lines);
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
     .accent{ display:none; }
-
-    /* Hide any WebKit scrollbars just in case (SL viewer is Chromium-based) */
-    ::-webkit-scrollbar{ width:0; height:0; }
+    ::-webkit-scrollbar{ width:0; height:0; } /* belt-and-braces */
   </style>
+
 
 </head>
 <body>
@@ -98,7 +107,8 @@
 
       // Escape then convert newlines to <br>
       // BEFORE: var safe = escapeHTML(trimmed).replace(/\n/g, "<br/>");
-      var safe = escapeHTML(trimmed).replace(/\n/g, " ");
+      var safe = escapeHTML(trimmed).replace(/\n/g, "<br/>");
+
 
 
       // Fallback placeholder if empty
