@@ -16,39 +16,42 @@
              'Helvetica Neue',Arial,'Noto Sans','Liberation Sans',sans-serif;
 
       --align:center;
-      --pad:2vmin;
 
-      /* How many lines you allow */
-      --max-lines:3;
+      /* Tighter padding so the lines have room */
+      --pad:1.2vmin;
 
-      /* More space under each line (was ~1.15) */
-      --line:1.28;
+      /* <<< four lines */
+      --max-lines:4;
 
-      /* Slightly smaller text (multiplier 0.82 < 0.92) */
+      /* A little more space between lines */
+      --line:1.24;
+
+      /* Text size = (viewport height − padding) / lines × fudge */
       --size:clamp(
-        12px,
-        calc((100vh - (var(--pad)*2)) / var(--max-lines) * 0.78),
-        72px
+        10px,
+        calc((100vh - (var(--pad)*2)) / var(--max-lines) * 0.90),
+        40px
       );
     }
 
+    /* keep your existing .msg rule, but it must include these bits */
     .msg{
       padding:var(--pad);
       font-size:var(--size);
       line-height:var(--line);
       text-align:var(--align);
+
+      /* wrap + clamp to N lines, no scrollbars */
       white-space:normal;
       word-break:break-word;
       overflow-wrap:anywhere;
-      hyphens:auto;
-
-      /* keep to N lines, no scrollbars */
       display:-webkit-box;
       -webkit-box-orient:vertical;
       -webkit-line-clamp:var(--max-lines);
       overflow:hidden;
       text-overflow:ellipsis;
     }
+
 
 
 
