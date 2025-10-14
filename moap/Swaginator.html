@@ -10,8 +10,10 @@
   <style>
     /* — Banner, multi-line, no scrollbars — */
 :root{
-  --bg:#0f1115;
-  --fg:#e9eef5;
+  /* SWAPPED: light bg, dark text */
+  --bg:#e9eef5;
+  --fg:#0f1115;
+
   --font:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,
          'Helvetica Neue',Arial,'Noto Sans','Liberation Sans',sans-serif;
 
@@ -50,50 +52,44 @@
   text-overflow:ellipsis;
 }
 
+*{ box-sizing:border-box; }
 
+html, body{
+  margin:0; padding:0; height:100%;
+  background:var(--bg); color:var(--fg); font-family:var(--font);
+  overflow:hidden;                    /* no scrollbars */
+}
 
+.wrap{ width:100vw; height:100vh; padding:0; }
+.card{
+  width:100vw; height:100vh;
+  background:var(--bg);
+  border:0; border-radius:0; box-shadow:none;
+  display:grid; place-items:center;
+  padding:0;
+}
 
+.msg{
+  padding:var(--pad);
+  font-size:var(--size);
+  line-height:var(--line);
+  text-align:var(--align);
+  white-space:normal;                 /* allow wrapping & <br> */
+  word-break:break-word;
+  overflow-wrap:anywhere;
+  hyphens:auto;
 
-    *{ box-sizing:border-box; }
+  /* clamp to N lines, ellipsis at end */
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:var(--max-lines);
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
 
-    html, body{
-      margin:0; padding:0; height:100%;
-      background:var(--bg); color:var(--fg); font-family:var(--font);
-      overflow:hidden;                    /* no scrollbars */
-    }
-
-    .wrap{ width:100vw; height:100vh; padding:0; }
-    .card{
-      width:100vw; height:100vh;
-      background:var(--bg);
-      border:0; border-radius:0; box-shadow:none;
-      display:grid; place-items:center;
-      padding:0;
-    }
-
-    .msg{
-      padding:var(--pad);
-      font-size:var(--size);
-      line-height:var(--line);
-      text-align:var(--align);
-      white-space:normal;                 /* allow wrapping & <br> */
-      word-break:break-word;
-      overflow-wrap:anywhere;
-      hyphens:auto;
-
-      /* clamp to N lines, ellipsis at end */
-      display:-webkit-box;
-      -webkit-box-orient:vertical;
-      -webkit-line-clamp:var(--max-lines);
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-
-    .accent{ display:none; }
-    ::-webkit-scrollbar{ width:0; height:0; } /* belt-and-braces */
+.accent{ display:none; }
+::-webkit-scrollbar{ width:0; height:0; } /* belt-and-braces */
   </style>
-
-
 </head>
 <body>
   <div class="wrap">
@@ -123,23 +119,15 @@
       }
 
       var raw = getParam("t") || "";
-      // normalize whitespace; keep intentional newlines
-      // If you *don’t* want line breaks, swap the <br> with a single space join.
       raw = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
-      // Enforce limit
       var trimmed = raw;
-      if (trimmed.length > MAX_LEN) {
-        trimmed = trimmed.slice(0, MAX_LEN - 1) + "…";
+      if (trimmed.length > 250) {
+        trimmed = trimmed.slice(0, 249) + "…";
       }
 
-      // Escape then convert newlines to <br>
-      // BEFORE: var safe = escapeHTML(trimmed).replace(/\n/g, "<br/>");
       var safe = escapeHTML(trimmed).replace(/\n/g, "<br/>");
 
-
-
-      // Fallback placeholder if empty
       if (!safe || safe.trim().length === 0) {
         safe = "<span style='opacity:.7'>(no message)</span>";
       }
