@@ -7,46 +7,63 @@
   <meta http-equiv="expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HUD Message (Fit-first, Scroll-last)</title>
-  <style>
-    :root{
-      /* High-contrast winter theme */
-      --bg:#1c232c;
-      --fg:#eaf2fb;
-      --accent:#bfe3ff;
 
+  <style>
+    /* ============================================================
+       ✦ TWEAKABLE DEFAULTS
+       - You can also override these at runtime via query params:
+         ?t=...&min_px=16&max_px=72&pref_px=44&min_lh=1.18&max_lh=1.36&pref_lh=1.26&min_pad=1.0&max_pad=1.6&pref_pad=1.2&align=center
+    ============================================================ */
+    :root{
+      /* THEME — very pale cream background, black text */
+      --bg:#f7f4e9;     /* page background */
+      --fg:#111111;     /* text colour */
+      --accent:#0e6b4f; /* used for scrollbar/hint; pick any accent */
+
+      /* TEXT ALIGNMENT: left | center | right (can override with ?align=) */
       --align:center;
 
-      /* Bounds */
-      --min-font-px:13;  --max-font-px:48;
-      --min-line:1.12;   --max-line:1.32;
-      --min-pad-vmin:0.8;--max-pad-vmin:2.0;
+      /* BOUNDS the fitter MUST respect (legibility first) */
+      --min-font-px:16;   /* absolute floor (12–16px typical) */
+      --max-font-px:72;   /* cap so short text doesn’t get comically huge */
+      --min-line:1.18;    /* tightest line-height allowed */
+      --max-line:1.36;    /* loosest line-height allowed */
+      --min-pad-vmin:1.0; /* smallest inner padding (vmin) before we allow scroll */
+      --max-pad-vmin:1.6; /* preferred padding upper bound */
 
-      /* Preferred start */
-      --pref-font-px:32; --pref-line:1.24; --pref-pad-vmin:1.6;
+      /* PREFERRED starting values (used for short text) */
+      --pref-font-px:44;
+      --pref-line:1.26;
+      --pref-pad-vmin:1.2;
 
       /* UI polish */
-      --scrollbar:10px;  --fade-height:16px;
+      --scrollbar:10px;   /* scrollbar width (Chromium/WebKit) */
+      --fade-height:16px; /* height of bottom fade when scrollable */
     }
 
+    /* Base reset + colours */
     *{ box-sizing:border-box; }
     html, body{
       margin:0; padding:0; height:100%;
       background:var(--bg); color:var(--fg);
       font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
                    'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif;
-      overflow:hidden;
+      overflow:hidden; /* only .msg will scroll when needed */
     }
 
     .wrap{ width:100vw; height:100vh; }
-    .card{ width:100vw; height:100vh; display:grid; place-items:center; }
+    .card{ width:100vw; height:100vh; display:grid; place-items:center; background:var(--bg); }
 
+    /* Fittable / sometimes scrollable message box */
     .msg{
-      /* seed visible defaults so you see text even if JS doesn’t run */
-      --fs: var(--pref-font-px, 28);
-      --lh: var(--pref-line, 1.24);
+      /* Seed visible defaults so text shows even if JS is blocked/late */
+      --fs:  var(--pref-font-px, 28);            /* font size (px) */
+      --lh:  var(--pref-line, 1.24);             /* line-height (unitless) */
       --pad: calc(var(--pref-pad-vmin, 1.6) * 1vmin);
 
       padding: var(--pad);
+
+      /* Safe fallbacks ensure we never get 0px if a var is empty on first paint */
       font-size: calc(var(--fs, 28) * 1px);
       line-height: var(--lh, 1.24);
       text-align: var(--align);
@@ -56,35 +73,41 @@
       overflow-wrap: anywhere;
       hyphens: auto;
 
-      overflow-y: hidden;
+      overflow-y: hidden;             /* JS adds .scrollable only if it can’t fit */
       max-width:100%; max-height:100%;
-      position:relative;
+      position:relative;              /* for fade + hint */
     }
 
+    /* Scrollable state */
     .msg.scrollable{
       overflow-y:auto;
       -webkit-overflow-scrolling:touch;
-      scrollbar-width:thin;
-      scrollbar-color:var(--accent) transparent;
+      scrollbar-width:thin;                      /* Firefox */
+      scrollbar-color:var(--accent) transparent; /* Firefox */
     }
     .msg.scrollable::-webkit-scrollbar{ width: var(--scrollbar); }
     .msg.scrollable::-webkit-scrollbar-thumb{
-      background: linear-gradient(180deg, var(--accent), #8fbfe8);
+      background: linear-gradient(180deg, var(--accent), #3da684);
       border-radius:8px;
     }
+    /* Subtle bottom fade to suggest “more below” (matches pale-cream bg) */
     .msg.scrollable::after{
       content:''; position:absolute; left:0; right:0; bottom:0;
       height:var(--fade-height); pointer-events:none;
-      background: linear-gradient(to bottom, rgba(28,35,44,0), rgba(28,35,44,.85));
+      background: linear-gradient(to bottom, rgba(247,244,233,0), rgba(247,244,233,.92));
     }
 
+    /* Tiny “Scroll” hint—only shown when scrollable */
     .hint{
       position:absolute; bottom:4px; right:8px;
-      font-size:11px; line-height:1; opacity:.85;
-      background:rgba(0,0,0,.18); padding:4px 6px; border-radius:6px;
+      font-size:11px; line-height:1; opacity:.9;
+      color:#0b3d2e; background:rgba(14,107,79,.12);
+      padding:4px 6px; border-radius:6px;
       display:none; user-select:none;
     }
     .msg.scrollable .hint{ display:block; }
+
+    @media (prefers-reduced-motion: reduce){ .breath{ animation:none !important; } }
   </style>
 </head>
 <body>
@@ -96,11 +119,12 @@
     </div>
   </div>
 
-  <!-- Defer so JS runs after DOM is ready -->
-  <script defer>
+  <!-- Defer: run after DOM is ready -->
+  <script type="text/javascript" defer>
     (function(){
       var QS = new URLSearchParams(location.search);
 
+      /* === helpers === */
       function cssVar(name){
         var v = getComputedStyle(document.documentElement).getPropertyValue(name);
         return (v && v.trim()) ? v.trim() : null;
@@ -108,9 +132,15 @@
       function num(x, fb){ var n = Number(x); return isFinite(n) ? n : fb; }
       function setVar(name, val){ document.documentElement.style.setProperty(name, val); }
 
-      var DEFAULTS = { minPx:13, maxPx:48, minLH:1.12, maxLH:1.32, minPad:0.8, maxPad:2.0,
-                       prefPx:32, prefLH:1.24, prefPad:1.6 };
+      var DEFAULTS = {
+        minPx:16, maxPx:72,       /* <- bounds fallback */
+        minLH:1.18, maxLH:1.36,
+        minPad:1.0, maxPad:1.6,
+        prefPx:44, prefLH:1.26,   /* <- preferred fallback */
+        prefPad:1.2
+      };
 
+      /* Read bounds & prefs: prefer query params, else CSS vars, else defaults */
       var bounds = {
         minPx:  num(QS.get('min_px'),  num(cssVar('--min-font-px'), DEFAULTS.minPx)),
         maxPx:  num(QS.get('max_px'),  num(cssVar('--max-font-px'), DEFAULTS.maxPx)),
@@ -125,25 +155,28 @@
         pad: num(QS.get('pref_pad'), num(cssVar('--pref-pad-vmin'),DEFAULTS.prefPad))
       };
 
+      /* Optional per-message alignment */
       var align = QS.get('align');
       if (align === 'left' || align === 'center' || align === 'right'){ setVar('--align', align); }
 
+      /* Start from preferred within bounds */
       setVar('--fs',  Math.max(bounds.minPx, Math.min(bounds.maxPx, prefs.px)));
       setVar('--lh',  Math.max(bounds.minLH, Math.min(bounds.maxLH, prefs.lh)));
       setVar('--pad', 'calc(' + Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad)) + ' * 1vmin)');
 
+      /* Message: escape + preserve explicit newlines as <br/> */
       function escapeHTML(s){
         return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
                 .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
       }
-      var raw = QS.get('t') || '';
-      raw = raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+      var raw = (QS.get('t') || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
       var safeHTML = escapeHTML(raw).replace(/\n/g,'<br/>');
 
       var msgEl  = document.getElementById('message');
       var hintEl = document.getElementById('hint');
       msgEl.innerHTML = safeHTML + msgEl.innerHTML;
 
+      /* --- fit-first, scroll-last --- */
       function fits(){
         var fade = parseFloat(getComputedStyle(msgEl).getPropertyValue('--fade-height')) || 0;
         return (msgEl.scrollHeight <= msgEl.clientHeight + 0.5) ||
@@ -152,7 +185,7 @@
 
       function bestFontSize(lo, hi){
         var best = lo, tries = 0;
-        while (hi - lo > 0.5 && tries < 20){
+        while (hi - lo > 0.5 && tries < 20){         /* px precision; guard cycles */
           var mid = (lo + hi) / 2;
           setVar('--fs', mid);
           if (fits()){ best = mid; lo = mid; } else { hi = mid; }
@@ -163,13 +196,15 @@
       }
 
       function fitOrScroll(){
-        // Reset to preferred within bounds each run
+        /* reset to preferred (clamped) on each run */
         setVar('--fs',  Math.max(bounds.minPx, Math.min(bounds.maxPx, prefs.px)));
         setVar('--lh',  Math.max(bounds.minLH, Math.min(bounds.maxLH, prefs.lh)));
         setVar('--pad', 'calc(' + Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad)) + ' * 1vmin)');
 
+        /* 1) maximize font within bounds */
         bestFontSize(bounds.minPx, bounds.maxPx);
 
+        /* 2) tighten line-height if still overflows */
         var lh = num(cssVar('--lh'), prefs.lh);
         if (!fits()){
           var step = 0.02;
@@ -180,6 +215,7 @@
           }
         }
 
+        /* 3) shave padding if still overflows */
         if (!fits()){
           var pad = Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad));
           var padStep = 0.2;
@@ -190,6 +226,7 @@
           }
         }
 
+        /* 4) still overflows → enable scrolling + hint */
         if (!fits()){
           msgEl.classList.add('scrollable');
           hintEl.style.display = 'block';
@@ -199,13 +236,7 @@
         }
       }
 
-      // Initial fit and on resize
+      /* initial fit + debounced resize */
       fitOrScroll();
-      window.addEventListener('resize', function(){
-        clearTimeout(window.__fit_to);
-        window.__fit_to = setTimeout(fitOrScroll, 60);
-      });
-    })();
-  </script>
-</body>
-</html>
+      var to = null;
+      window.addEventListener
