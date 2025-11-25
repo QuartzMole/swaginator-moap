@@ -14,6 +14,7 @@
     --bg:#f7f4e9;     /* very pale cream */
     --fg:#111111;     /* near-black text */
     --accent:#0e6b4f; /* scrollbar/hint accent */
+    --pad-bottom-extra: 6px;  /* extra space just at the bottom; adjust to taste */
 
     /* Alignment (override per message with ?align=left|center|right) */
     --align:center;
@@ -46,6 +47,7 @@
   .msg{
     /* Always-visible safe defaults (work even if JS never runs) */
     padding: calc(1.2vmin);
+    padding-bottom: calc(var(--pad) + var(--pad-bottom-extra));
     font-size: 32px;           /* visible immediately */
     line-height: 1.30;
     text-align: var(--align);
