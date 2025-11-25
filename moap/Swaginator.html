@@ -14,18 +14,20 @@
     --bg:#f7f4e9;     /* very pale cream */
     --fg:#111111;     /* near-black text */
     --accent:#0e6b4f; /* scrollbar/hint accent */
-    --pad-bottom-extra: 40px;  /* extra space just at the bottom; adjust to taste */
 
-    /* Alignment (override per message with ?align=left|center|right) */
+    /* Alignment (override with ?align=left|center|right) */
     --align:center;
 
-    /* Bounds for fitter (override via query params if you like) */
+    /* Fit bounds (override via query params if needed) */
     --min-font-px:16;  --max-font-px:72;
-    --min-line:1.16;   --max-line:1.36;
+    --min-line:1.18;   --max-line:1.36;
     --min-pad-vmin:1.0;--max-pad-vmin:1.6;
 
-    /* Preferred look when text is short */
-    --pref-font-px:40; --pref-line:1.26; --pref-pad-vmin:1.2;
+    /* Preferred look for short text */
+    --pref-font-px:44; --pref-line:1.26; --pref-pad-vmin:1.2;
+
+    /* Extra room for descenders at the bottom */
+    --pad-bottom-extra: 6px;
 
     /* UI polish */
     --scrollbar:10px;  --fade-height:16px;
@@ -37,30 +39,36 @@
     background:var(--bg);
     font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
                  'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif;
-    overflow:hidden; /* we only scroll the .msg if needed */
+    overflow:hidden; /* only .msg will scroll when needed */
   }
 
   .wrap{ width:100vw; height:100vh; }
   .card{ width:100vw; height:100vh; display:grid; place-items:center; background:var(--bg); }
 
-  /* Message box */
+  /* Message box (fittable / sometimes scrollable) */
   .msg{
-    /* Always-visible safe defaults (work even if JS never runs) */
-    padding: calc(1.2vmin);
+    /* visible defaults even if JS is late */
+    --fs:  var(--pref-font-px, 28);
+    --lh:  var(--pref-line, 1.24);
+    --pad: calc(var(--pref-pad-vmin, 1.2) * 1vmin);
+
+    padding: var(--pad);
+    /* add a few pixels at the bottom so descenders aren’t clipped */
     padding-bottom: calc(var(--pad) + var(--pad-bottom-extra));
-    font-size: 32px;           /* visible immediately */
-    line-height: 1.30;
+
+    font-size: calc(var(--fs, 28) * 1px);
+    line-height: var(--lh, 1.24);
     text-align: var(--align);
     color: var(--fg);
 
-    white-space: pre-wrap;      /* show \n as new lines */
+    white-space: pre-wrap;      /* show \n as lines (no HTML injection) */
     word-break: break-word;
     overflow-wrap: anywhere;
     hyphens: auto;
 
-    overflow-y: hidden;         /* JS may enable scroll if needed */
+    overflow-y: hidden;         /* JS adds .scrollable if needed */
     max-width:100%; max-height:100%;
-    position:relative;
+    position:relative;          /* for fade + hint */
   }
 
   .msg.scrollable{
@@ -99,37 +107,19 @@
     </div>
   </div>
 
-  <!-- Defer so DOM exists; robust fallbacks inside -->
+  <!-- Defer: run after DOM is ready -->
   <script defer>
-  (function(){
-    /* --- basic helpers --- */
-    function qs(){ return new URLSearchParams(location.search); }
-    function num(x, fb){ var n = Number(x); return isFinite(n) ? n : fb; }
-    function cvar(n){
-      var v = getComputedStyle(document.documentElement).getPropertyValue(n);
-      return (v && v.trim()) ? v.trim() : null;
-    }
-    function setVar(n, v){ document.documentElement.style.setProperty(n, v); }
+    (function(){
+      var QS = new URLSearchParams(location.search);
 
-    var params = qs();
+      /* helpers */
+      function cssVar(name){
+        var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+        return (v && v.trim()) ? v.trim() : null;
+      }
+      function num(x, fb){ var n = Number(x); return isFinite(n) ? n : fb; }
+      function setVar(name, val){ document.documentElement.style.setProperty(name, val); }
 
-    /* 1) Put the text in the box ASAP (so you always see something) */
-    var raw = (params.get('t') || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-    if (!raw) raw = '(no message)';
-    var msg  = document.getElementById('message');
-    var hint = document.getElementById('hint');
-    msg.textContent = raw;          /* no HTML injection */
-    msg.appendChild(hint);
-
-    /* Optional alignment override */
-    var align = params.get('align');
-    if (align === 'left' || align === 'center' || align === 'right'){
-      setVar('--align', align);
-    }
-
-    /* 2) Try the fit-first / scroll-last logic.
-          If anything goes wrong, we fall back to readable + scroll. */
-    try{
       var DEFAULTS = {
         minPx:16, maxPx:72,
         minLH:1.18, maxLH:1.36,
@@ -137,30 +127,39 @@
         prefPx:44, prefLH:1.26, prefPad:1.2
       };
 
+      /* bounds & prefs (query → CSS vars → defaults) */
       var bounds = {
-        minPx:  num(params.get('min_px'),  num(cvar('--min-font-px'), DEFAULTS.minPx)),
-        maxPx:  num(params.get('max_px'),  num(cvar('--max-font-px'), DEFAULTS.maxPx)),
-        minLH:  num(params.get('min_lh'),  num(cvar('--min-line'),    DEFAULTS.minLH)),
-        maxLH:  num(params.get('max_lh'),  num(cvar('--max-line'),    DEFAULTS.maxLH)),
-        minPad: num(params.get('min_pad'), num(cvar('--min-pad-vmin'),DEFAULTS.minPad)),
-        maxPad: num(params.get('max_pad'), num(cvar('--max-pad-vmin'),DEFAULTS.maxPad))
+        minPx:  num(QS.get('min_px'),  num(cssVar('--min-font-px'), DEFAULTS.minPx)),
+        maxPx:  num(QS.get('max_px'),  num(cssVar('--max-font-px'), DEFAULTS.maxPx)),
+        minLH:  num(QS.get('min_lh'),  num(cssVar('--min-line'),    DEFAULTS.minLH)),
+        maxLH:  num(QS.get('max_lh'),  num(cssVar('--max-line'),    DEFAULTS.maxLH)),
+        minPad: num(QS.get('min_pad'), num(cssVar('--min-pad-vmin'),DEFAULTS.minPad)),
+        maxPad: num(QS.get('max_pad'), num(cssVar('--max-pad-vmin'),DEFAULTS.maxPad))
       };
       var prefs = {
-        px:  num(params.get('pref_px'),  num(cvar('--pref-font-px'), DEFAULTS.prefPx)),
-        lh:  num(params.get('pref_lh'),  num(cvar('--pref-line'),    DEFAULTS.prefLH)),
-        pad: num(params.get('pref_pad'), num(cvar('--pref-pad-vmin'),DEFAULTS.prefPad))
+        px:  num(QS.get('pref_px'),  num(cssVar('--pref-font-px'), DEFAULTS.prefPx)),
+        lh:  num(QS.get('pref_lh'),  num(cssVar('--pref-line'),    DEFAULTS.prefLH)),
+        pad: num(QS.get('pref_pad'), num(cssVar('--pref-pad-vmin'),DEFAULTS.prefPad))
       };
 
-      /* Seed CSS vars the fitter will adjust */
+      /* optional alignment override */
+      var align = QS.get('align');
+      if (align === 'left' || align === 'center' || align === 'right'){ setVar('--align', align); }
+
+      /* seed CSS variables (JS does NOT set inline padding) */
       setVar('--fs',  Math.max(bounds.minPx, Math.min(bounds.maxPx, prefs.px)));
       setVar('--lh',  Math.max(bounds.minLH, Math.min(bounds.maxLH, prefs.lh)));
       setVar('--pad', 'calc(' + Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad)) + ' * 1vmin)');
 
-      /* Apply seeded values to the element immediately */
-      msg.style.fontSize  = 'var(--fs, 32)px';
-      msg.style.lineHeight= 'var(--lh, 1.30)';
-      msg.style.padding   = 'var(--pad)';
+      /* message text (raw; no HTML injection) */
+      var raw = (QS.get('t') || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+      if (!raw) raw = '(no message)';
+      var msg  = document.getElementById('message');
+      var hint = document.getElementById('hint');
+      msg.textContent = raw;
+      msg.appendChild(hint);
 
+      /* fit-first, scroll-last */
       function fits(){
         var fade = parseFloat(getComputedStyle(msg).getPropertyValue('--fade-height')) || 0;
         return (msg.scrollHeight <= msg.clientHeight + 0.5) ||
@@ -171,44 +170,39 @@
         while (hi - lo > 0.5 && tries < 20){
           var mid = (lo + hi) / 2;
           setVar('--fs', mid);
-          msg.style.fontSize = mid + 'px';
           if (fits()){ best = mid; lo = mid; } else { hi = mid; }
           tries++;
         }
         setVar('--fs', best);
-        msg.style.fontSize = best + 'px';
         return best;
       }
-
       function fitOrScroll(){
-        /* Reset to preferred (clamped) each pass */
+        /* reset to preferred (clamped) each pass */
         setVar('--fs',  Math.max(bounds.minPx, Math.min(bounds.maxPx, prefs.px)));
         setVar('--lh',  Math.max(bounds.minLH, Math.min(bounds.maxLH, prefs.lh)));
         setVar('--pad', 'calc(' + Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad)) + ' * 1vmin)');
-        msg.style.fontSize   = 'var(--fs)';  /* in case the UA resolves it directly */
-        msg.style.lineHeight = 'var(--lh)';
-        msg.style.padding    = 'var(--pad)';
 
+        /* 1) maximize font within bounds */
         bestFontSize(bounds.minPx, bounds.maxPx);
 
-        var lh = num(cvar('--lh'), prefs.lh);
+        /* 2) tighten line-height if still overflows */
+        var lh = num(cssVar('--lh'), prefs.lh);
         if (!fits()){
           var step = 0.02;
           while (lh - step >= bounds.minLH){
             lh = +(lh - step).toFixed(2);
             setVar('--lh', lh);
-            msg.style.lineHeight = String(lh);
             if (fits()) break;
           }
         }
 
+        /* 3) shave padding if still overflows (bottom cushion preserved by CSS) */
         if (!fits()){
           var pad = Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad));
           var padStep = 0.2;
           while (pad - padStep >= bounds.minPad){
             pad = +(pad - padStep).toFixed(2);
             setVar('--pad', 'calc(' + pad + ' * 1vmin)');
-            msg.style.padding = 'calc(' + pad + ' * 1vmin)';
             if (fits()) break;
           }
         }
@@ -222,19 +216,9 @@
         }
       }
 
-      /* Initial fit and on resize */
       fitOrScroll();
-      var to=null; window.addEventListener('resize', function(){ clearTimeout(to); to=setTimeout(fitOrScroll, 60); });
-
-    }catch(e){
-      /* 3) Fail-safe fallback: readable, scrollable */
-      msg.style.fontSize   = '28px';
-      msg.style.lineHeight = '1.30';
-      msg.style.padding    = '1vmin';
-      msg.classList.add('scrollable');
-      hint.style.display = 'block';
-    }
-  })();
+      var to=null; window.addEventListener('resize', function(){ clearTimeout(to); to=setTimeout(fitOrScroll,60); });
+    })();
   </script>
 </body>
 </html>
