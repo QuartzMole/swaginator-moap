@@ -6,33 +6,31 @@
 <meta http-equiv="pragma" content="no-cache" />
 <meta http-equiv="expires" content="0" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>HUD Message — Failsafe</title>
+<title>HUD Message — VH sizing</title>
 <style>
-  /* Light theme, no CSS var dependency */
   html,body{
     margin:0; padding:0; height:100%;
-    background:#f7f4e9;           /* pale cream */
-    color:#111;                    /* near-black */
+    background:#f7f4e9;             /* pale cream */
+    color:#111;                      /* near-black text */
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
                  "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
-    overflow:hidden;               /* only the message can scroll */
+    overflow:hidden;                 /* only the message can scroll */
   }
   .wrap{width:100vw;height:100vh;}
   .card{width:100vw;height:100vh;display:grid;place-items:center;}
   .msg{
-    /* visible defaults even if JS fails */
     box-sizing:border-box;
     max-width:100%; max-height:100%;
-    padding: 1.2vmin;             /* inner padding */
-    padding-bottom: calc(1.2vmin + 6px); /* descender cushion */
-    font-size: 44px;              /* default starting size */
+    padding: 1.2vmin;                         /* inner padding */
+    padding-bottom: calc(1.2vmin + 6px);      /* descender cushion */
+    font-size: 18vh;                          /* visible default if JS fails */
     line-height: 1.26;
     text-align: center;
-    white-space: pre-wrap;        /* keep \n newlines */
+    white-space: pre-wrap;                    /* keep \n newlines */
     word-break: break-word;
     overflow-wrap: anywhere;
     hyphens: auto;
-    overflow: hidden;             /* JS enables vertical scroll if needed */
+    overflow: hidden;                         /* JS enables vertical scroll if needed */
     position:relative;
   }
   .msg.scrollable{
@@ -57,14 +55,12 @@
     padding:4px 6px; border-radius:6px; user-select:none; display:none;
   }
   .msg.scrollable .hint{ display:block; }
-  /* Always show something if JS is blocked */
   noscript{display:block;text-align:center;padding:8px 12px;font-size:16px;}
 </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <!-- “Loading…” ensures you see *something* even if JS errors -->
       <div id="message" class="msg">Loading…</div>
       <div id="hint" class="hint">Scroll ▾</div>
     </div>
@@ -73,77 +69,87 @@
 
 <script>
 (function(){
-  // Safe helpers (no CSS-var dependency)
   function qs(){ return new URLSearchParams(location.search); }
-  function toNum(x, fb){ var n = Number(x); return isFinite(n)? n : fb; }
+  function num(x, fb){ var n = Number(x); return isFinite(n) ? n : fb; }
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 
-  // 1) Read inputs (with readable defaults)
   var p = qs();
-  var text = (p.get("t") || "").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
-  if (!text) text = "(no message)";
 
-  // Tweaks via URL (all optional)
-  var prefPx = toNum(p.get("pref_px"), 44);   // default font size
-  var maxPx  = toNum(p.get("max_px"),  72);   // upper bound
-  var minPx  = toNum(p.get("min_px"),  16);   // lower bound
-  var prefLH = toNum(p.get("pref_lh"), 1.26); // default line-height
-  var minLH  = toNum(p.get("min_lh"),  1.18); // lower bound on LH
-  var padVM  = toNum(p.get("pref_pad"),1.2);  // padding in vmin
-  var minPad = toNum(p.get("min_pad"), 1.0);  // min padding in vmin
-  var align  = p.get("align");
+  // Message and alignment
+  var txt = (p.get("t") || "").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  if (!txt) txt = "(no message)";
+  var align = p.get("align");
   if (align !== "left" && align !== "right") align = "center";
 
-  // 2) Put text on screen immediately
   var msg  = document.getElementById("message");
   var hint = document.getElementById("hint");
-  msg.textContent = text;
+  msg.textContent = txt;
   msg.style.textAlign = align;
 
-  // Apply starting styles inline so SL MOAP honors them
-  function apply(fs, lh, padVmin){
-    msg.style.fontSize  = fs + "px";
-    msg.style.lineHeight= String(lh);
-    msg.style.padding   = padVmin + "vmin";
+  // --- Sizing mode (default = vh) ---
+  var mode = (p.get("mode") || "vh").toLowerCase();
+
+  // VH controls (percent of viewer height)
+  var prefVH = num(p.get("pref_vh"), 18);   // good starting point for shallow banners
+  var minVH  = num(p.get("min_vh"),  10);
+  var maxVH  = num(p.get("max_vh"),  28);
+
+  // PX controls (only used if mode=px)
+  var prefPX = num(p.get("pref_px"), 44);
+  var minPX  = num(p.get("min_px"),  16);
+  var maxPX  = num(p.get("max_px"),  84);
+
+  // Common controls
+  var prefLH = num(p.get("pref_lh"), 1.26);
+  var minLH  = num(p.get("min_lh"),  1.16);
+  var padVM  = num(p.get("pref_pad"),1.2);
+  var minPad = num(p.get("min_pad"), 1.0);
+
+  // Apply inline so SL MOAP honors it
+  function apply(size, lh, padVmin){
+    if (mode === "px")  msg.style.fontSize  = size + "px";
+    else                msg.style.fontSize  = size + "vh";
+    msg.style.lineHeight = String(lh);
+    msg.style.padding    = padVmin + "vmin";
     msg.style.paddingBottom = "calc(" + padVmin + "vmin + 6px)";
   }
 
-  // clamp helper
-  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
-
-  // 3) Fit-first, then scroll if needed (binary search on font size)
+  // Fit helpers
   function fits(){
-    // allow a tiny epsilon so off-by-1px doesn’t oscillate
     return msg.scrollHeight <= msg.clientHeight + 0.5;
   }
-
-  function bestFont(lo, hi){
+  function bestSize(lo, hi, lh, pad){
     var best = lo, tries = 0;
-    while (hi - lo > 0.5 && tries < 20){
+    while (hi - lo > 0.1 && tries < 24){        // precision: 0.1 vh/px
       var mid = (lo + hi) / 2;
-      apply(mid, curLH, curPad);
+      apply(mid, lh, pad);
       if (fits()){ best = mid; lo = mid; } else { hi = mid; }
       tries++;
     }
-    apply(best, curLH, curPad);
+    apply(best, lh, pad);
     return best;
   }
 
-  var curPad = clamp(padVM, minPad, Math.max(minPad, 1.6)); // don’t let pad explode
+  // Seed values
+  var curPad = clamp(padVM, minPad, Math.max(minPad, 1.6));
   var curLH  = clamp(prefLH, minLH, 1.36);
+  var curSize = (mode === "px")
+    ? clamp(prefPX, minPX, maxPX)
+    : clamp(prefVH, minVH, maxVH);
 
-  // Seed
-  apply(clamp(prefPx, minPx, maxPx), curLH, curPad);
+  apply(curSize, curLH, curPad);
 
   try{
-    // 1) Maximize font size within bounds
-    bestFont(minPx, maxPx);
+    // 1) Maximize font within bounds
+    if (mode === "px") bestSize(minPX, maxPX, curLH, curPad);
+    else               bestSize(minVH, maxVH, curLH, curPad);
 
     // 2) Tighten line-height if still too tall
     if (!fits()){
       var step = 0.02;
       while (curLH - step >= minLH){
         curLH = +(curLH - step).toFixed(2);
-        apply(parseFloat(msg.style.fontSize), curLH, curPad);
+        apply(curSize, curLH, curPad);
         if (fits()) break;
       }
     }
@@ -153,16 +159,17 @@
       var pstep = 0.2;
       while (curPad - pstep >= minPad){
         curPad = +(curPad - pstep).toFixed(2);
-        apply(parseFloat(msg.style.fontSize), curLH, curPad);
+        apply(curSize, curLH, curPad);
         if (fits()) break;
       }
     }
   }catch(e){
-    // If anything throws, we fall back to readable defaults
-    apply(32, 1.30, 1.0);
+    // Fail-safe defaults
+    if (mode === "px") apply(32, 1.30, 1.0);
+    else               apply(18, 1.30, 1.0);
   }
 
-  // 4) If still overflowing, enable scroll
+  // 4) Enable scroll if still overflowing
   if (!fits()){
     msg.classList.add("scrollable");
     hint.style.display = "block";
@@ -171,20 +178,16 @@
     hint.style.display = "none";
   }
 
-  // 5) Refitting on resize (debounced)
+  // 5) Refit on resize (debounced)
   var t=null;
   window.addEventListener("resize", function(){
     clearTimeout(t);
     t = setTimeout(function(){
-      // re-run with the same bounds
-      curPad = clamp(curPad, minPad, 1.6);
-      curLH  = clamp(curLH, minLH, 1.36);
-      bestFont(minPx, maxPx);
-      if (!fits()){
-        msg.classList.add("scrollable"); hint.style.display="block";
-      }else{
-        msg.classList.remove("scrollable"); hint.style.display="none";
-      }
+      // refit at same bounds
+      if (mode === "px") bestSize(minPX, maxPX, curLH, curPad);
+      else               bestSize(minVH, maxVH, curLH, curPad);
+      if (!fits()){ msg.classList.add("scrollable"); hint.style.display="block"; }
+      else         { msg.classList.remove("scrollable"); hint.style.display="none"; }
     }, 60);
   });
 })();
