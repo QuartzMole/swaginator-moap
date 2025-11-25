@@ -1,97 +1,92 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="pragma" content="no-cache" />
-  <meta http-equiv="expires" content="0" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HUD Message (Fit-first, Scroll-last)</title>
+<meta charset="utf-8" />
+<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="pragma" content="no-cache" />
+<meta http-equiv="expires" content="0" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HUD Message (Fit-first, Scroll-last)</title>
 
-  <style>
-    :root{
-      /* Light, high-contrast theme */
-      --bg:#f7f4e9;     /* very pale cream */
-      --fg:#111111;     /* near-black text */
-      --accent:#0e6b4f; /* scrollbar/hint accent */
+<style>
+  :root{
+    /* Light theme */
+    --bg:#f7f4e9;     /* very pale cream */
+    --fg:#111111;     /* near-black text */
+    --accent:#0e6b4f; /* scrollbar/hint accent */
 
-      /* Alignment (overrideable with ?align=left|center|right) */
-      --align:center;
+    /* Alignment (override per message with ?align=left|center|right) */
+    --align:center;
 
-      /* Fit bounds (you can override via query params) */
-      --min-font-px:16;  --max-font-px:72;
-      --min-line:1.18;   --max-line:1.36;
-      --min-pad-vmin:1.0;--max-pad-vmin:1.6;
+    /* Bounds for fitter (override via query params if you like) */
+    --min-font-px:16;  --max-font-px:72;
+    --min-line:1.18;   --max-line:1.36;
+    --min-pad-vmin:1.0;--max-pad-vmin:1.6;
 
-      /* Preferred starting look for short text */
-      --pref-font-px:44; --pref-line:1.26; --pref-pad-vmin:1.2;
+    /* Preferred look when text is short */
+    --pref-font-px:44; --pref-line:1.26; --pref-pad-vmin:1.2;
 
-      /* UI polish */
-      --scrollbar:10px;  --fade-height:16px;
-    }
+    /* UI polish */
+    --scrollbar:10px;  --fade-height:16px;
+  }
 
-    *{ box-sizing:border-box; }
-    html, body{
-      margin:0; padding:0; height:100%;
-      background:var(--bg);
-      font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,
-                  'Helvetica Neue',Arial,'Noto Sans','Liberation Sans',sans-serif;
-      overflow:hidden; /* only .msg will ever scroll */
-    }
+  *{ box-sizing:border-box; }
+  html, body{
+    margin:0; padding:0; height:100%;
+    background:var(--bg);
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+                 'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif;
+    overflow:hidden; /* we only scroll the .msg if needed */
+  }
 
-    .wrap{ width:100vw; height:100vh; }
-    .card{ width:100vw; height:100vh; display:grid; place-items:center; background:var(--bg); }
+  .wrap{ width:100vw; height:100vh; }
+  .card{ width:100vw; height:100vh; display:grid; place-items:center; background:var(--bg); }
 
-    .msg{
-      /* visible defaults even if JS hiccups */
-      --fs:  var(--pref-font-px, 28);
-      --lh:  var(--pref-line, 1.24);
-      --pad: calc(var(--pref-pad-vmin, 1.2) * 1vmin);
+  /* Message box */
+  .msg{
+    /* Always-visible safe defaults (work even if JS never runs) */
+    padding: calc(1.2vmin);
+    font-size: 32px;           /* visible immediately */
+    line-height: 1.30;
+    text-align: var(--align);
+    color: var(--fg);
 
-      padding: var(--pad);
+    white-space: pre-wrap;      /* show \n as new lines */
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    hyphens: auto;
 
-      font-size: calc(var(--fs, 28) * 1px);
-      line-height: var(--lh, 1.24);
-      text-align: var(--align);
-      color: var(--fg);                 /* <-- explicit text colour */
+    overflow-y: hidden;         /* JS may enable scroll if needed */
+    max-width:100%; max-height:100%;
+    position:relative;
+  }
 
-      /* render raw text with newlines (no HTML injection) */
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-      hyphens: auto;
+  .msg.scrollable{
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;                      /* Firefox */
+    scrollbar-color:var(--accent) transparent; /* Firefox */
+  }
+  .msg.scrollable::-webkit-scrollbar{ width: var(--scrollbar); }
+  .msg.scrollable::-webkit-scrollbar-thumb{
+    background: linear-gradient(180deg, var(--accent), #3da684);
+    border-radius:8px;
+  }
+  .msg.scrollable::after{
+    content:''; position:absolute; left:0; right:0; bottom:0;
+    height:var(--fade-height); pointer-events:none;
+    background: linear-gradient(to bottom, rgba(247,244,233,0), rgba(247,244,233,.92));
+  }
 
-      overflow-y: hidden;
-      max-width:100%; max-height:100%;
-      position:relative;
-    }
-
-    .msg.scrollable{
-      overflow-y:auto;
-      -webkit-overflow-scrolling:touch;
-      scrollbar-width:thin;                      /* Firefox */
-      scrollbar-color:var(--accent) transparent; /* Firefox */
-    }
-    .msg.scrollable::-webkit-scrollbar{ width: var(--scrollbar); }
-    .msg.scrollable::-webkit-scrollbar-thumb{
-      background: linear-gradient(180deg, var(--accent), #3da684);
-      border-radius:8px;
-    }
-    .msg.scrollable::after{
-      content:''; position:absolute; left:0; right:0; bottom:0;
-      height:var(--fade-height); pointer-events:none;
-      background: linear-gradient(to bottom, rgba(247,244,233,0), rgba(247,244,233,.92));
-    }
-
-    .hint{
-      position:absolute; bottom:4px; right:8px;
-      font-size:11px; line-height:1; opacity:.9;
-      color:#0b3d2e; background:rgba(14,107,79,.12);
-      padding:4px 6px; border-radius:6px;
-      display:none; user-select:none;
-    }
-    .msg.scrollable .hint{ display:block; }
-  </style>
+  .hint{
+    position:absolute; bottom:4px; right:8px;
+    font-size:11px; line-height:1; opacity:.9;
+    color:#0b3d2e; background:rgba(14,107,79,.12);
+    padding:4px 6px; border-radius:6px;
+    display:none; user-select:none;
+  }
+  .msg.scrollable .hint{ display:block; }
+</style>
 </head>
 <body>
   <div class="wrap">
@@ -102,18 +97,37 @@
     </div>
   </div>
 
+  <!-- Defer so DOM exists; robust fallbacks inside -->
   <script defer>
-    (function(){
-      var QS = new URLSearchParams(location.search);
+  (function(){
+    /* --- basic helpers --- */
+    function qs(){ return new URLSearchParams(location.search); }
+    function num(x, fb){ var n = Number(x); return isFinite(n) ? n : fb; }
+    function cvar(n){
+      var v = getComputedStyle(document.documentElement).getPropertyValue(n);
+      return (v && v.trim()) ? v.trim() : null;
+    }
+    function setVar(n, v){ document.documentElement.style.setProperty(n, v); }
 
-      /* helpers */
-      function cssVar(name){
-        var v = getComputedStyle(document.documentElement).getPropertyValue(name);
-        return (v && v.trim()) ? v.trim() : null;
-      }
-      function num(x, fb){ var n = Number(x); return isFinite(n) ? n : fb; }
-      function setVar(name, val){ document.documentElement.style.setProperty(name, val); }
+    var params = qs();
 
+    /* 1) Put the text in the box ASAP (so you always see something) */
+    var raw = (params.get('t') || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    if (!raw) raw = '(no message)';
+    var msg  = document.getElementById('message');
+    var hint = document.getElementById('hint');
+    msg.textContent = raw;          /* no HTML injection */
+    msg.appendChild(hint);
+
+    /* Optional alignment override */
+    var align = params.get('align');
+    if (align === 'left' || align === 'center' || align === 'right'){
+      setVar('--align', align);
+    }
+
+    /* 2) Try the fit-first / scroll-last logic.
+          If anything goes wrong, we fall back to readable + scroll. */
+    try{
       var DEFAULTS = {
         minPx:16, maxPx:72,
         minLH:1.18, maxLH:1.36,
@@ -121,91 +135,104 @@
         prefPx:44, prefLH:1.26, prefPad:1.2
       };
 
-      /* read bounds / prefs (query → CSS vars → defaults) */
       var bounds = {
-        minPx:  num(QS.get('min_px'),  num(cssVar('--min-font-px'), DEFAULTS.minPx)),
-        maxPx:  num(QS.get('max_px'),  num(cssVar('--max-font-px'), DEFAULTS.maxPx)),
-        minLH:  num(QS.get('min_lh'),  num(cssVar('--min-line'),    DEFAULTS.minLH)),
-        maxLH:  num(QS.get('max_lh'),  num(cssVar('--max-line'),    DEFAULTS.maxLH)),
-        minPad: num(QS.get('min_pad'), num(cssVar('--min-pad-vmin'),DEFAULTS.minPad)),
-        maxPad: num(QS.get('max_pad'), num(cssVar('--max-pad-vmin'),DEFAULTS.maxPad))
+        minPx:  num(params.get('min_px'),  num(cvar('--min-font-px'), DEFAULTS.minPx)),
+        maxPx:  num(params.get('max_px'),  num(cvar('--max-font-px'), DEFAULTS.maxPx)),
+        minLH:  num(params.get('min_lh'),  num(cvar('--min-line'),    DEFAULTS.minLH)),
+        maxLH:  num(params.get('max_lh'),  num(cvar('--max-line'),    DEFAULTS.maxLH)),
+        minPad: num(params.get('min_pad'), num(cvar('--min-pad-vmin'),DEFAULTS.minPad)),
+        maxPad: num(params.get('max_pad'), num(cvar('--max-pad-vmin'),DEFAULTS.maxPad))
       };
       var prefs = {
-        px:  num(QS.get('pref_px'),  num(cssVar('--pref-font-px'), DEFAULTS.prefPx)),
-        lh:  num(QS.get('pref_lh'),  num(cssVar('--pref-line'),    DEFAULTS.prefLH)),
-        pad: num(QS.get('pref_pad'), num(cssVar('--pref-pad-vmin'),DEFAULTS.prefPad))
+        px:  num(params.get('pref_px'),  num(cvar('--pref-font-px'), DEFAULTS.prefPx)),
+        lh:  num(params.get('pref_lh'),  num(cvar('--pref-line'),    DEFAULTS.prefLH)),
+        pad: num(params.get('pref_pad'), num(cvar('--pref-pad-vmin'),DEFAULTS.prefPad))
       };
 
-      var align = QS.get('align');
-      if (align === 'left' || align === 'center' || align === 'right'){ setVar('--align', align); }
-
-      /* set starting (clamped) values */
+      /* Seed CSS vars the fitter will adjust */
       setVar('--fs',  Math.max(bounds.minPx, Math.min(bounds.maxPx, prefs.px)));
       setVar('--lh',  Math.max(bounds.minLH, Math.min(bounds.maxLH, prefs.lh)));
       setVar('--pad', 'calc(' + Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad)) + ' * 1vmin)');
 
-      /* message text (raw → shown as-is with pre-wrap) */
-      var raw = (QS.get('t') || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-      if (!raw) { raw = '(no message)'; } /* safe fallback */
-      var msgEl  = document.getElementById('message');
-      var hintEl = document.getElementById('hint');
-      msgEl.textContent = raw;            /* <<< key change: no HTML, no escaping needed */
-      msgEl.appendChild(hintEl);          /* keep the hint inside */
+      /* Apply seeded values to the element immediately */
+      msg.style.fontSize  = 'var(--fs, 32)px';
+      msg.style.lineHeight= 'var(--lh, 1.30)';
+      msg.style.padding   = 'var(--pad)';
 
-      /* fit-first, scroll-last */
       function fits(){
-        var fade = parseFloat(getComputedStyle(msgEl).getPropertyValue('--fade-height')) || 0;
-        return (msgEl.scrollHeight <= msgEl.clientHeight + 0.5) ||
-               (msgEl.scrollHeight - fade <= msgEl.clientHeight + 0.5);
+        var fade = parseFloat(getComputedStyle(msg).getPropertyValue('--fade-height')) || 0;
+        return (msg.scrollHeight <= msg.clientHeight + 0.5) ||
+               (msg.scrollHeight - fade <= msg.clientHeight + 0.5);
       }
       function bestFontSize(lo, hi){
         var best = lo, tries = 0;
         while (hi - lo > 0.5 && tries < 20){
           var mid = (lo + hi) / 2;
           setVar('--fs', mid);
+          msg.style.fontSize = mid + 'px';
           if (fits()){ best = mid; lo = mid; } else { hi = mid; }
           tries++;
         }
         setVar('--fs', best);
+        msg.style.fontSize = best + 'px';
         return best;
       }
+
       function fitOrScroll(){
+        /* Reset to preferred (clamped) each pass */
         setVar('--fs',  Math.max(bounds.minPx, Math.min(bounds.maxPx, prefs.px)));
         setVar('--lh',  Math.max(bounds.minLH, Math.min(bounds.maxLH, prefs.lh)));
         setVar('--pad', 'calc(' + Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad)) + ' * 1vmin)');
+        msg.style.fontSize   = 'var(--fs)';  /* in case the UA resolves it directly */
+        msg.style.lineHeight = 'var(--lh)';
+        msg.style.padding    = 'var(--pad)';
 
         bestFontSize(bounds.minPx, bounds.maxPx);
 
-        var lh = num(cssVar('--lh'), prefs.lh);
+        var lh = num(cvar('--lh'), prefs.lh);
         if (!fits()){
           var step = 0.02;
           while (lh - step >= bounds.minLH){
             lh = +(lh - step).toFixed(2);
             setVar('--lh', lh);
+            msg.style.lineHeight = String(lh);
             if (fits()) break;
           }
         }
+
         if (!fits()){
           var pad = Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad));
           var padStep = 0.2;
           while (pad - padStep >= bounds.minPad){
             pad = +(pad - padStep).toFixed(2);
             setVar('--pad', 'calc(' + pad + ' * 1vmin)');
+            msg.style.padding = 'calc(' + pad + ' * 1vmin)';
             if (fits()) break;
           }
         }
+
         if (!fits()){
-          msgEl.classList.add('scrollable');
-          hintEl.style.display = 'block';
+          msg.classList.add('scrollable');
+          hint.style.display = 'block';
         }else{
-          msgEl.classList.remove('scrollable');
-          hintEl.style.display = 'none';
+          msg.classList.remove('scrollable');
+          hint.style.display = 'none';
         }
       }
 
+      /* Initial fit and on resize */
       fitOrScroll();
-      var to=null; window.addEventListener('resize', function(){ clearTimeout(to); to=setTimeout(fitOrScroll,60); });
-    })();
+      var to=null; window.addEventListener('resize', function(){ clearTimeout(to); to=setTimeout(fitOrScroll, 60); });
+
+    }catch(e){
+      /* 3) Fail-safe fallback: readable, scrollable */
+      msg.style.fontSize   = '28px';
+      msg.style.lineHeight = '1.30';
+      msg.style.padding    = '1vmin';
+      msg.classList.add('scrollable');
+      hint.style.display = 'block';
+    }
+  })();
   </script>
 </body>
 </html>
