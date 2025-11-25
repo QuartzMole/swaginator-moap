@@ -19,7 +19,7 @@
     --align:center;
 
     /* Fit bounds (override via query params if needed) */
-    --min-font-px:16;  --max-font-px:72;
+    --min-font-px:20;  --max-font-px:72;
     --min-line:1.18;   --max-line:1.36;
     --min-pad-vmin:1.0;--max-pad-vmin:1.6;
 
@@ -27,7 +27,7 @@
     --pref-font-px:44; --pref-line:1.26; --pref-pad-vmin:1.2;
 
     /* Extra room for descenders at the bottom */
-    --pad-bottom-extra: 6px;
+    --pad-bottom-extra: 10px;
 
     /* UI polish */
     --scrollbar:10px;  --fade-height:16px;
@@ -120,15 +120,6 @@
       function num(x, fb){ var n = Number(x); return isFinite(n) ? n : fb; }
       function setVar(name, val){ document.documentElement.style.setProperty(name, val); }
 
-      /* MOAP patch: also apply chosen sizes inline on the element */
-      function applySizesFromVars(el){
-        var fs = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fs')) || 32;
-        var lh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lh')) || 1.26;
-        el.style.fontSize   = fs + 'px';
-        el.style.lineHeight = String(lh);
-        /* padding is left to CSS so bottom cushion remains in effect */
-      }
-
       var DEFAULTS = {
         minPx:16, maxPx:72,
         minLH:1.18, maxLH:1.36,
@@ -160,17 +151,13 @@
       setVar('--lh',  Math.max(bounds.minLH, Math.min(bounds.maxLH, prefs.lh)));
       setVar('--pad', 'calc(' + Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad)) + ' * 1vmin)');
 
-      var msg  = document.getElementById('message');
-      var hint = document.getElementById('hint');
-
       /* message text (raw; no HTML injection) */
       var raw = (QS.get('t') || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
       if (!raw) raw = '(no message)';
+      var msg  = document.getElementById('message');
+      var hint = document.getElementById('hint');
       msg.textContent = raw;
       msg.appendChild(hint);
-
-      /* ensure initial sizes are reflected inline for MOAP */
-      applySizesFromVars(msg);
 
       /* fit-first, scroll-last */
       function fits(){
@@ -183,16 +170,55 @@
         while (hi - lo > 0.5 && tries < 20){
           var mid = (lo + hi) / 2;
           setVar('--fs', mid);
-          applySizesFromVars(msg);               // MOAP: reflect change
           if (fits()){ best = mid; lo = mid; } else { hi = mid; }
           tries++;
         }
         setVar('--fs', best);
-        applySizesFromVars(msg);                 // final inline size
         return best;
       }
       function fitOrScroll(){
         /* reset to preferred (clamped) each pass */
         setVar('--fs',  Math.max(bounds.minPx, Math.min(bounds.maxPx, prefs.px)));
         setVar('--lh',  Math.max(bounds.minLH, Math.min(bounds.maxLH, prefs.lh)));
-        setVar('--pad', 'calc(' + Math.max(bounds.minPad, Math.min(bounds.maxPad, pref
+        setVar('--pad', 'calc(' + Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad)) + ' * 1vmin)');
+
+        /* 1) maximize font within bounds */
+        bestFontSize(bounds.minPx, bounds.maxPx);
+
+        /* 2) tighten line-height if still overflows */
+        var lh = num(cssVar('--lh'), prefs.lh);
+        if (!fits()){
+          var step = 0.02;
+          while (lh - step >= bounds.minLH){
+            lh = +(lh - step).toFixed(2);
+            setVar('--lh', lh);
+            if (fits()) break;
+          }
+        }
+
+        /* 3) shave padding if still overflows (bottom cushion preserved by CSS) */
+        if (!fits()){
+          var pad = Math.max(bounds.minPad, Math.min(bounds.maxPad, prefs.pad));
+          var padStep = 0.2;
+          while (pad - padStep >= bounds.minPad){
+            pad = +(pad - padStep).toFixed(2);
+            setVar('--pad', 'calc(' + pad + ' * 1vmin)');
+            if (fits()) break;
+          }
+        }
+
+        if (!fits()){
+          msg.classList.add('scrollable');
+          hint.style.display = 'block';
+        }else{
+          msg.classList.remove('scrollable');
+          hint.style.display = 'none';
+        }
+      }
+
+      fitOrScroll();
+      var to=null; window.addEventListener('resize', function(){ clearTimeout(to); to=setTimeout(fitOrScroll,60); });
+    })();
+  </script>
+</body>
+</html>
