@@ -30,7 +30,8 @@
     word-break: break-word;
     overflow-wrap: anywhere;
     hyphens: auto;
-    overflow: hidden;                         /* JS enables vertical scroll if needed */
+    overflow-x: hidden;
+    overflow-y: hidden;                       /* JS enables vertical scroll if needed */
     position:relative;
   }
   .msg.scrollable{
@@ -75,6 +76,9 @@
 
   var p = qs();
 
+  // NEW: no-shrink flag – if no_shrink=1, we do not auto-minimise the font.
+  var noShrink = (p.get("no_shrink") === "1");
+
   // Message and alignment
   var txt = (p.get("t") || "").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
   if (!txt) txt = "(no message)";
@@ -118,6 +122,7 @@
   function fits(){
     return msg.scrollHeight <= msg.clientHeight + 0.5;
   }
+
   function bestSize(lo, hi, lh, pad){
     var best = lo, tries = 0;
     while (hi - lo > 0.1 && tries < 24){        // precision: 0.1 vh/px
@@ -140,27 +145,29 @@
   apply(curSize, curLH, curPad);
 
   try{
-    // 1) Maximize font within bounds
-    if (mode === "px") bestSize(minPX, maxPX, curLH, curPad);
-    else               bestSize(minVH, maxVH, curLH, curPad);
+    if (!noShrink) {
+      // 1) Maximize font within bounds
+      if (mode === "px") bestSize(minPX, maxPX, curLH, curPad);
+      else               bestSize(minVH, maxVH, curLH, curPad);
 
-    // 2) Tighten line-height if still too tall
-    if (!fits()){
-      var step = 0.02;
-      while (curLH - step >= minLH){
-        curLH = +(curLH - step).toFixed(2);
-        apply(curSize, curLH, curPad);
-        if (fits()) break;
+      // 2) Tighten line-height if still too tall
+      if (!fits()){
+        var step = 0.02;
+        while (curLH - step >= minLH){
+          curLH = +(curLH - step).toFixed(2);
+          apply(curSize, curLH, curPad);
+          if (fits()) break;
+        }
       }
-    }
 
-    // 3) Shave padding if still too tall
-    if (!fits()){
-      var pstep = 0.2;
-      while (curPad - pstep >= minPad){
-        curPad = +(curPad - pstep).toFixed(2);
-        apply(curSize, curLH, curPad);
-        if (fits()) break;
+      // 3) Shave padding if still too tall
+      if (!fits()){
+        var pstep = 0.2;
+        while (curPad - pstep >= minPad){
+          curPad = +(curPad - pstep).toFixed(2);
+          apply(curSize, curLH, curPad);
+          if (fits()) break;
+        }
       }
     }
   }catch(e){
@@ -183,11 +190,22 @@
   window.addEventListener("resize", function(){
     clearTimeout(t);
     t = setTimeout(function(){
-      // refit at same bounds
-      if (mode === "px") bestSize(minPX, maxPX, curLH, curPad);
-      else               bestSize(minVH, maxVH, curLH, curPad);
-      if (!fits()){ msg.classList.add("scrollable"); hint.style.display="block"; }
-      else         { msg.classList.remove("scrollable"); hint.style.display="none"; }
+      if (!noShrink) {
+        // re-run size search within same bounds
+        if (mode === "px") bestSize(minPX, maxPX, curLH, curPad);
+        else               bestSize(minVH, maxVH, curLH, curPad);
+      } else {
+        // fixed size: just reapply and then decide if it needs scrolling
+        apply(curSize, curLH, curPad);
+      }
+
+      if (!fits()){
+        msg.classList.add("scrollable");
+        hint.style.display="block";
+      }else{
+        msg.classList.remove("scrollable");
+        hint.style.display="none";
+      }
     }, 60);
   });
 })();
